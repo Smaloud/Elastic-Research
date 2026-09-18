@@ -1,0 +1,11 @@
+Paperlib PDF ingestion smoke test
+
+Abstract
+This document describes evidence-aware retrieval for scientific literature.
+It combines PostgreSQL full-text search, multilingual vector embeddings, and
+reciprocal rank fusion. Extracted passages retain page numbers so that later
+structured facts can point back to their source.
+
+Methods
+The system indexes documents in bounded chunks and keeps personal importance
+and familiarity separate from global relevance.

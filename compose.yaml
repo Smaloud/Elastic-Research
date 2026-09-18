@@ -1,0 +1,45 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-paperlib}
+      POSTGRES_USER: ${POSTGRES_USER:-paperlib}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-paperlib_dev}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-54329}:5432"
+    volumes:
+      - paperlib_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-paperlib} -d ${POSTGRES_DB:-paperlib}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-mirror.gcr.io/library/python:3.12-slim}
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-paperlib}:${POSTGRES_PASSWORD:-paperlib_dev}@db:5432/${POSTGRES_DB:-paperlib}
+      STORAGE_PATH: /data/files
+      FIGURE_PATH: /data/figures
+      MODEL_CACHE_PATH: /models
+      LLM_CONFIG_PATH: /data/private/llm.json
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-fastembed}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-384}
+    ports:
+      - "127.0.0.1:${PAPERLIB_PORT:-8765}:8000"
+    volumes:
+      - ./data:/data
+      - paperlib_models:/models
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  paperlib_db:
+  paperlib_models:

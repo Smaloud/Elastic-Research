@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paperlib · 本地论文库</title>
+    <link rel="stylesheet" href="/assets/styles.css?v=0.2.1" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">LOCAL · POSTGRESQL · PGVECTOR</p>
+        <h1>Paperlib</h1>
+        <p class="subtitle">把论文、书籍和你自己的判断放在同一个可检索知识库里。</p>
+      </div>
+      <div class="top-actions">
+        <nav class="view-tabs" aria-label="主要功能">
+          <button class="tab-button active" data-view="library">资料库</button>
+          <button class="tab-button" data-view="llm">LLM 提取</button>
+        </nav>
+        <button id="open-add" class="primary">＋ 添加资料</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="notice" class="notice hidden" role="status"></div>
+
+      <section id="view-library" class="view active">
+        <section class="search-panel">
+          <div class="search-row">
+            <input id="query" type="search" placeholder="搜索方法、术语、实验结论……" autofocus />
+            <select id="mode" aria-label="检索模式">
+              <option value="hybrid">混合检索</option>
+              <option value="keyword">关键词</option>
+              <option value="semantic">向量语义</option>
+            </select>
+            <button id="search" class="primary">检索</button>
+          </div>
+          <details>
+            <summary>筛选条件</summary>
+            <div class="filters">
+              <label>起始年份<input id="year-from" type="number" min="1000" max="3000" /></label>
+              <label>结束年份<input id="year-to" type="number" min="1000" max="3000" /></label>
+              <label>标签<input id="tag" placeholder="例如 retrieval" /></label>
+              <label>最低重要度<input id="min-importance" type="number" min="0" max="5" /></label>
+              <label>最高熟悉度<input id="max-familiarity" type="number" min="0" max="5" /></label>
+            </div>
+          </details>
+        </section>
+        <section id="results" class="results" aria-live="polite"></section>
+      </section>
+
+      <section id="view-llm" class="view">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LOCAL-FIRST · REVIEW BEFORE WRITE</p>
+            <h2>LLM 结构化提取</h2>
+            <p class="subtitle">连接你自己的本地模型或 OpenAI 兼容服务。提取结果先进入审核区，不会自动改动人工标签。</p>
+          </div>
+          <span id="llm-status" class="status-pill">尚未配置</span>
+        </div>
+
+        <div class="settings-layout">
+          <form id="llm-form" class="settings-card">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">CONNECTION</p>
+                <h3>模型连接</h3>
+              </div>
+              <label class="switch-label"><input id="llm-enabled" type="checkbox" /> 启用</label>
+            </div>
+            <div class="form-grid">
+              <label>接入方式
+                <select id="llm-provider">
+                  <option value="ollama">本机 Ollama</option>
+                  <option value="openai_compatible">OpenAI 兼容接口</option>
+                </select>
+              </label>
+              <label>模型名称<input id="llm-model" placeholder="qwen3:8b 或 openrouter 模型 ID" /></label>
+            </div>
+            <label class="wide">接口地址<input id="llm-base-url" placeholder="http://host.docker.internal:11434/v1" /></label>
+            <label class="wide">API Key（留空表示保留现有密钥）
+              <input id="llm-api-key" type="password" autocomplete="new-password" placeholder="仅保存在本机，不会重新显示" />
+            </label>
+            <label class="clear-key"><input id="llm-clear-key" type="checkbox" /> 删除已保存的 API Key</label>
+            <div class="form-grid">
+              <label>单次最大输入字符数<input id="llm-max-chars" type="number" min="4000" max="300000" step="1000" /></label>
+              <label>Temperature<input id="llm-temperature" type="number" min="0" max="2" step="0.1" /></label>
+            </div>
+            <p id="key-state" class="hint"></p>
+            <div class="button-row">
+              <button type="submit" class="primary" id="save-llm">保存设置</button>
+              <button type="button" class="small-button" id="test-llm">测试连接</button>
+            </div>
+          </form>
+
+          <aside class="workflow-card">
+            <p class="eyebrow">WORKFLOW</p>
+            <h3>怎样使用</h3>
+            <ol>
+              <li>选择 Ollama 或兼容接口，保存后测试连接。</li>
+              <li>回到资料库，在论文卡片上点击“LLM 提取”。</li>
+              <li>逐项审核术语、方法、数据集、发现、局限与建议标签。</li>
+              <li>只有接受的建议标签会写入检索标签。</li>
+            </ol>
+            <div class="privacy-note">
+              <strong>数据边界</strong>
+              <span>Ollama 在本机处理；云端接口会把论文文本发送给你配置的服务商。</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="add-dialog">
+      <form id="add-form">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">MANUAL INGEST</p>
+            <h2>添加论文或书籍</h2>
+          </div>
+          <button type="button" id="close-add" class="icon-button" aria-label="关闭">×</button>
+        </div>
+
+        <label class="wide">标题<input name="title" required /></label>
+        <div class="form-grid">
+          <label>类型
+            <select name="kind">
+              <option value="paper">论文</option>
+              <option value="book">书籍</option>
+              <option value="thesis">学位论文</option>
+              <option value="report">技术报告</option>
+              <option value="chapter">章节</option>
+            </select>
+          </label>
+          <label>年份<input name="publication_year" type="number" min="1000" max="3000" /></label>
+          <label>作者<input name="authors" placeholder="逗号分隔" /></label>
+          <label>Venue<input name="venue" /></label>
+          <label>DOI<input name="doi" /></label>
+          <label>arXiv ID<input name="arxiv_id" /></label>
+          <label>标签<input name="tags" placeholder="逗号分隔" /></label>
+          <label>阅读状态
+            <select name="reading_status">
+              <option value="unread">未读</option>
+              <option value="queued">待读</option>
+              <option value="reading">阅读中</option>
+              <option value="read">已读</option>
+              <option value="archived">归档</option>
+            </select>
+          </label>
+          <label>重要度（0–5）<input name="importance" type="number" min="0" max="5" value="0" /></label>
+          <label>熟悉度（0–5）<input name="familiarity" type="number" min="0" max="5" value="0" /></label>
+        </div>
+        <label class="wide">摘要<textarea name="abstract" rows="5"></textarea></label>
+        <label class="wide file-field">PDF 文件<input name="file" type="file" accept="application/pdf,.pdf" /></label>
+        <p class="hint">首次生成向量时会下载本地模型，提交可能需要稍等。扫描版 PDF 暂只保存文件，后续接 OCR。</p>
+        <button type="submit" class="primary wide" id="submit-add">保存并索引</button>
+      </form>
+    </dialog>
+
+    <dialog id="analysis-dialog" class="analysis-dialog">
+      <div class="analysis-shell">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">STRUCTURED EXTRACTION</p>
+            <h2 id="analysis-title">提取结果</h2>
+          </div>
+          <button type="button" id="close-analysis" class="icon-button" aria-label="关闭">×</button>
+        </div>
+        <p class="hint">模型结果可能有误。接受建议标签后才会写入资料库；其他条目会记录你的审核状态。</p>
+        <div id="analysis-results" class="analysis-results"></div>
+      </div>
+    </dialog>
+
+    <script src="/assets/app.js?v=0.2.1" defer></script>
+  </body>
+</html>
