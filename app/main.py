@@ -1,4 +1,6 @@
-from contextlib import asynccontextmanager
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,10 +11,32 @@ from app.api.routes import router
 from app.config import get_settings
 from app.database import SessionLocal, initialize_database
 from app.services.extraction import adopt_existing_extractions
+from app.services.zotero_config import load_zotero_config
+from app.services.zotero_sync import ZoteroUnavailable, sync_library as sync_zotero_library
 
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = ROOT / "static"
+logger = logging.getLogger(__name__)
+
+
+def _run_zotero_sync() -> None:
+    with SessionLocal() as session:
+        try:
+            sync_zotero_library(session)
+        except ZoteroUnavailable as exc:
+            logger.warning("Automatic Zotero sync skipped: %s", exc)
+        except Exception:
+            logger.exception("Automatic Zotero sync failed")
+
+
+async def _periodic_zotero_sync() -> None:
+    await asyncio.sleep(60)
+    while True:
+        config = load_zotero_config()
+        if config.enabled and config.api_key:
+            await asyncio.to_thread(_run_zotero_sync)
+        await asyncio.sleep(15 * 60)
 
 
 @asynccontextmanager
@@ -25,7 +49,13 @@ async def lifespan(_: FastAPI):
     initialize_database()
     with SessionLocal() as session:
         adopt_existing_extractions(session)
-    yield
+    zotero_task = asyncio.create_task(_periodic_zotero_sync())
+    try:
+        yield
+    finally:
+        zotero_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await zotero_task
 
 
 app = FastAPI(

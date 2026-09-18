@@ -99,6 +99,11 @@ dialog form { padding: 1.4rem; }
 .fact-value { margin: .55rem 0; color: #26372f; line-height: 1.55; white-space: pre-wrap; }
 .evidence { margin: .55rem 0; border-left: 2px solid #bdd2c7; padding-left: .7rem; color: var(--muted); font-size: .84rem; }
 .review-status { color: var(--muted); font-size: .78rem; }
+.sync-summary { margin-top: 1rem; }
+.sync-summary h3 { margin: .25rem 0 .8rem; }
+.sync-metrics { display: flex; flex-wrap: wrap; gap: .7rem; }
+.sync-metrics span { border: 1px solid var(--line); border-radius: 999px; padding: .45rem .7rem; color: var(--muted); background: #fff; }
+.sync-metrics strong { color: var(--accent-dark); margin-right: .2rem; }
 .compact-settings { margin-bottom: 1rem; }
 .compact-settings summary { color: var(--accent-dark); font-weight: 750; }
 .inline-settings { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: .8rem; align-items: end; padding-top: 1rem; }

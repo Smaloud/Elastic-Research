@@ -221,6 +221,44 @@ class FactReviewInput(BaseModel):
     status: Literal["accepted", "rejected", "unreviewed"]
 
 
+class ZoteroSettingsInput(BaseModel):
+    enabled: bool = False
+    api_key: str | None = Field(default=None, max_length=4000)
+    clear_api_key: bool = False
+    collection_name: str = Field(default="Paperlib", min_length=1, max_length=255)
+    auto_push_discovered: bool = True
+
+    @field_validator("collection_name")
+    @classmethod
+    def clean_collection_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Zotero collection 名称不能为空")
+        return value
+
+
+class ZoteroSettingsOut(BaseModel):
+    enabled: bool
+    api_key_configured: bool
+    api_key_hint: str | None = None
+    user_id: int | None = None
+    username: str | None = None
+    collection_name: str
+    collection_key: str | None = None
+    auto_push_discovered: bool
+    last_library_version: int = 0
+
+
+class ZoteroSyncOut(BaseModel):
+    imported: int = 0
+    linked: int = 0
+    enriched: int = 0
+    pushed: int = 0
+    skipped: int = 0
+    library_version: int = 0
+    warnings: list[str] = Field(default_factory=list)
+
+
 class SemanticScholarSettingsInput(BaseModel):
     api_key: str | None = Field(default=None, max_length=4000)
     clear_api_key: bool = False

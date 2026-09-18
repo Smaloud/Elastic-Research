@@ -34,6 +34,9 @@ from app.schemas import (
     WorkCreate,
     WorkAnalysisOut,
     WorkOut,
+    ZoteroSettingsInput,
+    ZoteroSettingsOut,
+    ZoteroSyncOut,
 )
 from app.services.embeddings import EmbeddingUnavailable
 from app.services.extraction import apply_fact_review, extract_work
@@ -62,6 +65,17 @@ from app.services.semantic_scholar import (
     search_papers,
 )
 from app.services.serialization import analysis_to_out, fact_to_out, work_to_out
+from app.services.zotero_config import (
+    config_to_out as zotero_config_to_out,
+    load_zotero_config,
+    save_zotero_config,
+)
+from app.services.zotero_sync import (
+    ZoteroUnavailable,
+    push_work_if_enabled,
+    sync_library as sync_zotero_library,
+    verify_connection as verify_zotero_connection,
+)
 
 
 router = APIRouter(prefix="/api/v1")
@@ -97,6 +111,7 @@ def add_work(payload: WorkCreate, session: Session = Depends(get_db)) -> IngestR
     except IntegrityError as exc:
         session.rollback()
         raise HTTPException(status_code=409, detail="记录与已有 DOI/arXiv ID 冲突") from exc
+    result.warnings.extend(push_work_if_enabled(session, result.work))
     return IngestResponse(work=work_to_out(session, result.work), warnings=result.warnings)
 
 
@@ -162,6 +177,7 @@ def upload_work(
         session.rollback()
         raise HTTPException(status_code=409, detail="记录与已有标识符冲突") from exc
 
+    warnings.extend(push_work_if_enabled(session, result.work))
     session.refresh(result.work)
     return IngestResponse(work=work_to_out(session, result.work), warnings=warnings)
 
@@ -399,9 +415,37 @@ def import_semantic_scholar_paper(
     except DuplicateWorkError as exc:
         session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    warnings.extend(push_work_if_enabled(session, work))
     return S2ImportOut(
         work=work_to_out(session, work),
         created=created,
         citation_edges_added=edges,
         warnings=warnings,
     )
+
+
+@router.get("/zotero/settings", response_model=ZoteroSettingsOut)
+def get_zotero_settings() -> ZoteroSettingsOut:
+    return zotero_config_to_out(load_zotero_config())
+
+
+@router.put("/zotero/settings", response_model=ZoteroSettingsOut)
+def update_zotero_settings(payload: ZoteroSettingsInput) -> ZoteroSettingsOut:
+    return zotero_config_to_out(save_zotero_config(payload))
+
+
+@router.post("/zotero/test", response_model=ZoteroSettingsOut)
+def test_zotero_connection() -> ZoteroSettingsOut:
+    try:
+        return zotero_config_to_out(verify_zotero_connection())
+    except ZoteroUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/zotero/sync", response_model=ZoteroSyncOut)
+def run_zotero_sync(session: Session = Depends(get_db)) -> ZoteroSyncOut:
+    try:
+        return sync_zotero_library(session)
+    except ZoteroUnavailable as exc:
+        session.rollback()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc

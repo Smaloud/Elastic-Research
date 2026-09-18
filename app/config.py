@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     model_cache_path: Path = Path("data/models")
     llm_config_path: Path = Path("data/private/llm.json")
     semantic_scholar_config_path: Path = Path("data/private/semantic_scholar.json")
+    zotero_config_path: Path = Path("data/private/zotero.json")
 
     embedding_provider: str = "fastembed"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"

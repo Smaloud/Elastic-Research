@@ -28,6 +28,7 @@
 - Semantic Scholar 关键词搜索与候选预览；
 - 展开一篇论文的引用或参考文献，并保存本地引用关系；
 - 选择 2–5 篇本地种子，查找同时引用全部种子的后续研究。
+- Zotero 个人资料库非破坏式双向同步：导入已有文献，并把手工或 Semantic Scholar 新增记录自动写回专用 collection；
 
 ## 在界面中接入 LLM
 
@@ -72,11 +73,23 @@ API Key 以仅当前系统用户可读的权限保存在本项目 `data/private/
 
 大多数 Semantic Scholar 接口允许匿名访问，但匿名请求共享限流。遇到 429 时可稍后重试，或在页面内展开“Semantic Scholar API 设置”并填写自己的 Key。系统严格按约 1 请求/秒节流。Key 保存在 `data/private/semantic_scholar.json`，不会进入 Git。
 
+## Zotero 双向同步
+
+打开顶部“Zotero 同步”页：
+
+1. 在 [Zotero API Keys](https://www.zotero.org/settings/keys/new) 创建一个只供 Paperlib 使用的 Key，并允许读取、写入个人资料库。
+2. 在页面填写 Key、勾选启用并保存，然后点击“测试连接”。用户 ID 会自动识别，不需要手工查找。
+3. 点击“立即双向同步”。首次同步会读取 Zotero 已有文献，并按 DOI、arXiv、标题和年份关联或去重；Paperlib 中尚未关联的文献会写入指定 collection。
+4. 启用“自动写入”后，手工新增或从 Semantic Scholar 导入的论文会同时写入 Zotero；Paperlib 运行期间还会每 15 分钟执行一次增量同步，打开 Zotero 页面时也会立即同步。
+
+同步默认不传播删除，也不会用空值或远端字段覆盖 Paperlib 已有人工信息。当前版本同步文献元数据和标签，PDF 附件双向传输将在下一阶段加入。Key 以仅当前系统用户可读的权限保存在 `data/private/zotero.json`，不会进入 Git。
+
 ## 数据位置与边界
 
 - PDF：`data/files`
 - LLM 配置：`data/private/llm.json`
 - Semantic Scholar 配置：`data/private/semantic_scholar.json`
+- Zotero 配置：`data/private/zotero.json`
 - PostgreSQL：Docker 命名卷 `paperlib_db`
 - 向量模型：Docker 命名卷 `paperlib_models`
 - 服务仅监听 `127.0.0.1`，尚未开放实验室多用户访问。

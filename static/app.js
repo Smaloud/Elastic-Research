@@ -299,6 +299,7 @@ function setView(viewName) {
   $("#open-add").classList.toggle("hidden", viewName !== "library");
   showNotice("");
   if (viewName === "llm") loadLLMSettings();
+  if (viewName === "zotero") loadZoteroSettings(true);
   if (viewName === "discover") {
     loadS2Settings();
     loadSeedWorks();
@@ -387,6 +388,114 @@ $("#test-llm").addEventListener("click", async () => {
     button.textContent = "测试连接";
   }
 });
+
+let zoteroAutoSynced = false;
+
+async function loadZoteroSettings(runAutomaticSync = false) {
+  try {
+    const config = await request("/api/v1/zotero/settings");
+    $("#zotero-enabled").checked = config.enabled;
+    $("#zotero-api-key").value = "";
+    $("#zotero-clear-key").checked = false;
+    $("#zotero-collection").value = config.collection_name;
+    $("#zotero-auto-push").checked = config.auto_push_discovered;
+    $("#zotero-key-state").textContent = config.api_key_configured
+      ? `API Key 已保存在本机（${config.api_key_hint}）${config.username ? `；账号：${config.username}` : ""}`
+      : "尚未配置 Key。请创建只供 Paperlib 使用的 Zotero Key。";
+    const status = $("#zotero-status");
+    status.textContent = config.enabled
+      ? (config.username ? `已启用 · ${config.username}` : "已启用 · 等待测试")
+      : "尚未启用";
+    status.classList.toggle("ready", config.enabled && config.api_key_configured);
+    if (runAutomaticSync && config.enabled && config.api_key_configured && !zoteroAutoSynced) {
+      zoteroAutoSynced = true;
+      await runZoteroSync(true);
+    }
+    return config;
+  } catch (error) {
+    showNotice(error.message, true);
+    return null;
+  }
+}
+
+$("#zotero-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#save-zotero");
+  button.disabled = true;
+  try {
+    await request("/api/v1/zotero/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        enabled: $("#zotero-enabled").checked,
+        api_key: $("#zotero-api-key").value || null,
+        clear_api_key: $("#zotero-clear-key").checked,
+        collection_name: $("#zotero-collection").value,
+        auto_push_discovered: $("#zotero-auto-push").checked,
+      }),
+    });
+    zoteroAutoSynced = false;
+    await loadZoteroSettings(false);
+    showNotice("Zotero 设置已保存在本机。下一步请点击“测试连接”。");
+  } catch (error) {
+    showNotice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#test-zotero").addEventListener("click", async () => {
+  const button = $("#test-zotero");
+  button.disabled = true;
+  button.textContent = "正在测试……";
+  try {
+    const config = await request("/api/v1/zotero/test", { method: "POST" });
+    await loadZoteroSettings(false);
+    showNotice(`连接成功：${config.username || `用户 ${config.user_id}`}，已确认个人资料库读写权限。`);
+  } catch (error) {
+    showNotice(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "测试连接";
+  }
+});
+
+function renderZoteroSummary(result) {
+  const summary = $("#zotero-summary");
+  summary.innerHTML = `
+    <p class="eyebrow">LAST SYNC</p>
+    <h3>同步完成</h3>
+    <div class="sync-metrics">
+      <span><strong>${result.imported}</strong> 从 Zotero 新增</span>
+      <span><strong>${result.linked}</strong> 已有记录关联</span>
+      <span><strong>${result.enriched}</strong> 本地记录补全</span>
+      <span><strong>${result.pushed}</strong> 写入 Zotero</span>
+      <span><strong>${result.skipped}</strong> 跳过</span>
+    </div>
+    <p class="hint">Zotero library version：${result.library_version}</p>`;
+  summary.classList.remove("hidden");
+}
+
+async function runZoteroSync(automatic = false) {
+  const button = $("#sync-zotero");
+  button.disabled = true;
+  button.textContent = "正在同步……";
+  if (!automatic) showNotice("正在非破坏式同步 Zotero 与 Paperlib，请稍候……");
+  try {
+    const result = await request("/api/v1/zotero/sync", { method: "POST" });
+    renderZoteroSummary(result);
+    const message = `Zotero 同步完成：导入 ${result.imported}，关联 ${result.linked}，补全 ${result.enriched}，写回 ${result.pushed}。`;
+    showNotice(result.warnings.length ? `${message} ${result.warnings.join("；")}` : message, result.warnings.length > 0);
+    await runSearch();
+  } catch (error) {
+    showNotice(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "立即双向同步";
+  }
+}
+
+$("#sync-zotero").addEventListener("click", () => runZoteroSync(false));
 
 let s2Context = { seedIds: [], relation: "none" };
 
@@ -604,7 +713,8 @@ $("#s2-results").addEventListener("click", async (event) => {
     card.classList.add("imported");
     card.querySelector(".rank").textContent = "已在本地库";
     button.textContent = result.created ? "已导入" : "已存在";
-    showNotice(`《${result.work.title}》已进入本地库；新增 ${result.citation_edges_added} 条引用关系。`);
+    const warningText = result.warnings?.length ? ` 提示：${result.warnings.join("；")}` : "";
+    showNotice(`《${result.work.title}》已进入本地库；新增 ${result.citation_edges_added} 条引用关系。${warningText}`, Boolean(result.warnings?.length));
     await loadSeedWorks();
   } catch (error) {
     button.disabled = false;
@@ -616,3 +726,4 @@ $("#s2-results").addEventListener("click", async (event) => {
 runSearch();
 loadLLMSettings();
 loadS2Settings();
+loadZoteroSettings(false);
