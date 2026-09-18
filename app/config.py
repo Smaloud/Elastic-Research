@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     figure_path: Path = Path("data/figures")
     model_cache_path: Path = Path("data/models")
     llm_config_path: Path = Path("data/private/llm.json")
+    semantic_scholar_config_path: Path = Path("data/private/semantic_scholar.json")
 
     embedding_provider: str = "fastembed"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"

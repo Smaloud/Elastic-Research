@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Paperlib · 本地论文库</title>
-    <link rel="stylesheet" href="/assets/styles.css?v=0.2.1" />
+    <link rel="stylesheet" href="/assets/styles.css?v=0.3.1" />
   </head>
   <body>
     <header class="topbar">
@@ -16,6 +16,7 @@
       <div class="top-actions">
         <nav class="view-tabs" aria-label="主要功能">
           <button class="tab-button active" data-view="library">资料库</button>
+          <button class="tab-button" data-view="discover">论文发现</button>
           <button class="tab-button" data-view="llm">LLM 提取</button>
         </nav>
         <button id="open-add" class="primary">＋ 添加资料</button>
@@ -48,6 +49,76 @@
           </details>
         </section>
         <section id="results" class="results" aria-live="polite"></section>
+      </section>
+
+      <section id="view-discover" class="view">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SEMANTIC SCHOLAR · CITATION GRAPH</p>
+            <h2>论文发现</h2>
+            <p class="subtitle">搜索外部论文、展开一跳引用网络，或查找同时引用 2–5 篇种子论文的后续研究。</p>
+          </div>
+          <span id="s2-status" class="status-pill">匿名访问</span>
+        </div>
+
+        <details class="settings-card compact-settings">
+          <summary>Semantic Scholar API 设置（可选）</summary>
+          <form id="s2-form" class="inline-settings">
+            <label>API Key（留空保留现有密钥）
+              <input id="s2-api-key" type="password" autocomplete="new-password" placeholder="匿名模式也可以使用" />
+            </label>
+            <label class="clear-key"><input id="s2-clear-key" type="checkbox" /> 删除已保存的 Key</label>
+            <div class="button-row">
+              <button type="submit" class="primary" id="save-s2">保存设置</button>
+              <button type="button" class="small-button" id="test-s2">测试连接</button>
+            </div>
+            <p id="s2-key-state" class="hint"></p>
+          </form>
+        </details>
+
+        <div class="discover-grid">
+          <section class="settings-card">
+            <p class="eyebrow">GLOBAL SEARCH</p>
+            <h3>按标题或关键词搜索</h3>
+            <div class="search-row compact-row">
+              <input id="s2-query" type="search" placeholder="输入论文标题、作者或关键词" />
+              <button id="s2-search" class="primary">搜索</button>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <p class="eyebrow">ONE-HOP GRAPH</p>
+            <h3>展开一篇种子论文</h3>
+            <label>种子论文<select id="s2-expand-seed"></select></label>
+            <div class="button-row wrap-row">
+              <button id="s2-citations" class="small-button">找引用它的论文</button>
+              <button id="s2-references" class="small-button">找它引用的论文</button>
+            </div>
+          </section>
+        </div>
+
+        <section class="settings-card intersection-card">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">MULTI-SEED INTERSECTION</p>
+              <h3>谁同时引用了这些论文？</h3>
+            </div>
+            <span class="status-pill">选择 2–5 篇</span>
+          </div>
+          <div class="intersection-controls">
+            <label>本地种子论文（按住 ⌘ 可多选）
+              <select id="s2-intersection-seeds" multiple size="6"></select>
+            </label>
+            <div class="intersection-options">
+              <label>每篇最多获取<input id="s2-limit" type="number" min="10" max="500" value="200" /></label>
+              <label>只看此年份以后<input id="s2-year-from" type="number" min="1000" max="3000" placeholder="可选" /></label>
+              <button id="s2-intersection" class="primary">查找交集</button>
+            </div>
+          </div>
+        </section>
+
+        <div id="s2-result-heading" class="result-summary hidden"></div>
+        <section id="s2-results" class="results" aria-live="polite"></section>
       </section>
 
       <section id="view-llm" class="view">
@@ -172,6 +243,6 @@
       </div>
     </dialog>
 
-    <script src="/assets/app.js?v=0.2.1" defer></script>
+    <script src="/assets/app.js?v=0.3.1" defer></script>
   </body>
 </html>

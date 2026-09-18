@@ -102,6 +102,29 @@ dialog form { padding: 1.4rem; }
 .review-status { color: var(--muted); font-size: .78rem; }
 .accept-button.accepted { background: #e4f5ec; border-color: #8fc5ad; }
 .reject-button.rejected { background: #fbecea; border-color: #daa49c; color: #7d2e23; }
+.compact-settings { margin-bottom: 1rem; }
+.compact-settings summary { color: var(--accent-dark); font-weight: 750; }
+.inline-settings { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: .8rem; align-items: end; padding-top: 1rem; }
+.inline-settings .button-row { margin: 0; }
+.inline-settings .hint { grid-column: 1 / -1; margin: 0; }
+.discover-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.discover-grid h3, .intersection-card h3 { margin: .3rem 0 1rem; }
+.compact-row { grid-template-columns: 1fr auto; }
+.wrap-row { flex-wrap: wrap; }
+.intersection-controls { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 1rem; align-items: end; }
+.intersection-controls select[multiple] { min-height: 10rem; padding: .35rem; }
+.intersection-controls select[multiple] option { padding: .45rem .5rem; border-radius: 6px; }
+.intersection-controls select[multiple] option:checked { background: var(--accent) linear-gradient(0deg, var(--accent), var(--accent)); color: white; }
+.intersection-options { display: grid; gap: .65rem; }
+.result-summary { margin: 1.2rem 0 .5rem; color: var(--muted); font-size: .88rem; }
+.s2-card { position: relative; }
+.s2-card.imported { border-color: #8fc5ad; background: #f5fbf8; }
+.s2-metrics { display: flex; flex-wrap: wrap; gap: .4rem; margin: .65rem 0; }
+.metric { border: 1px solid var(--line); border-radius: 7px; padding: .25rem .45rem; color: var(--muted); font-size: .74rem; }
+.seed-match { margin: .65rem 0; border-left: 3px solid var(--accent); padding-left: .65rem; color: var(--accent-dark); font-size: .82rem; }
+.s2-actions { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-top: .8rem; }
+.external-links { display: flex; flex-wrap: wrap; gap: .7rem; font-size: .82rem; }
+.external-links a { color: var(--accent); }
 
 @media (max-width: 760px) {
   .topbar { align-items: flex-start; flex-direction: column; }
@@ -113,6 +136,9 @@ dialog form { padding: 1.4rem; }
   .state-row { grid-template-columns: 1fr 1fr; }
   .pdf-link { justify-self: start; }
   .settings-layout { grid-template-columns: 1fr; }
+  .discover-grid, .intersection-controls { grid-template-columns: 1fr; }
+  .inline-settings { grid-template-columns: 1fr; align-items: stretch; }
+  .inline-settings .hint { grid-column: auto; }
 }
 
 @media (max-width: 480px) {

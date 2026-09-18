@@ -13,6 +13,15 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function safeUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
 function showNotice(message, isError = false) {
   if (!message) {
     notice.classList.add("hidden");
@@ -269,6 +278,10 @@ function setView(viewName) {
   $("#open-add").classList.toggle("hidden", viewName !== "library");
   showNotice("");
   if (viewName === "llm") loadLLMSettings();
+  if (viewName === "discover") {
+    loadS2Settings();
+    loadSeedWorks();
+  }
 }
 
 document.querySelectorAll(".tab-button").forEach((button) => {
@@ -354,5 +367,231 @@ $("#test-llm").addEventListener("click", async () => {
   }
 });
 
+let s2Context = { seedIds: [], relation: "none" };
+
+async function loadS2Settings() {
+  try {
+    const config = await request("/api/v1/s2/settings");
+    $("#s2-api-key").value = "";
+    $("#s2-clear-key").checked = false;
+    $("#s2-key-state").textContent = config.api_key_configured
+      ? `API Key 已保存在本机，仅当前系统用户可读（${config.api_key_hint}）`
+      : "当前使用匿名访问；繁忙时可能受到共享限流。";
+    const status = $("#s2-status");
+    status.textContent = config.api_key_configured ? "API Key 已配置" : "匿名访问";
+    status.classList.toggle("ready", config.api_key_configured);
+  } catch (error) {
+    showNotice(error.message, true);
+  }
+}
+
+$("#s2-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#save-s2");
+  button.disabled = true;
+  try {
+    await request("/api/v1/s2/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: $("#s2-api-key").value || null,
+        clear_api_key: $("#s2-clear-key").checked,
+      }),
+    });
+    await loadS2Settings();
+    showNotice("Semantic Scholar 设置已保存在本机。");
+  } catch (error) {
+    showNotice(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#test-s2").addEventListener("click", async () => {
+  const button = $("#test-s2");
+  button.disabled = true;
+  button.textContent = "正在测试……";
+  try {
+    const result = await request("/api/v1/s2/test", { method: "POST" });
+    showNotice(`${result.message}${result.sample_title ? `；示例结果：${result.sample_title}` : ""}`);
+  } catch (error) {
+    showNotice(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "测试连接";
+  }
+});
+
+async function loadSeedWorks() {
+  try {
+    const data = await request("/api/v1/search?q=&mode=keyword&limit=100");
+    const options = data.hits.map(({ work }) => {
+      const suffix = [work.publication_year, work.authors.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
+      return `<option value="${work.id}">${escapeHtml(work.title)}${suffix ? ` — ${escapeHtml(suffix)}` : ""}</option>`;
+    }).join("");
+    const empty = '<option value="" disabled>请先在资料库添加论文</option>';
+    $("#s2-expand-seed").innerHTML = options || empty;
+    $("#s2-intersection-seeds").innerHTML = options || empty;
+  } catch (error) {
+    showNotice(error.message, true);
+  }
+}
+
+function renderS2Paper(paper) {
+  const authors = paper.authors.slice(0, 8).join(", ");
+  const meta = [paper.year, paper.venue, authors].filter(Boolean).join(" · ");
+  const matches = paper.matched_seed_titles?.length
+    ? `<p class="seed-match">匹配 ${paper.match_count} 篇种子：${paper.matched_seed_titles.map(escapeHtml).join("；")}</p>`
+    : "";
+  const semanticScholarUrl = safeUrl(paper.url);
+  const openPdfUrl = safeUrl(paper.open_access_pdf_url);
+  return `
+    <article class="result-card s2-card ${paper.already_in_library ? "imported" : ""}" data-paper-id="${escapeHtml(paper.paper_id)}">
+      <div class="result-head">
+        <div>
+          <h3>${escapeHtml(paper.title)}</h3>
+          <p class="meta">${escapeHtml(meta)}</p>
+        </div>
+        <span class="rank">${paper.already_in_library ? "已在本地库" : "候选"}</span>
+      </div>
+      <div class="s2-metrics">
+        ${paper.citation_count != null ? `<span class="metric">被引 ${paper.citation_count}</span>` : ""}
+        ${paper.reference_count != null ? `<span class="metric">参考文献 ${paper.reference_count}</span>` : ""}
+        ${paper.doi ? `<span class="metric">DOI</span>` : ""}
+        ${paper.arxiv_id ? `<span class="metric">arXiv</span>` : ""}
+      </div>
+      ${matches}
+      <p class="snippet">${escapeHtml(paper.abstract || "暂无摘要")}</p>
+      <div class="s2-actions">
+        <div class="external-links">
+          ${semanticScholarUrl ? `<a href="${escapeHtml(semanticScholarUrl)}" target="_blank" rel="noreferrer">Semantic Scholar</a>` : ""}
+          ${openPdfUrl ? `<a href="${escapeHtml(openPdfUrl)}" target="_blank" rel="noreferrer">开放 PDF</a>` : ""}
+        </div>
+        <button class="small-button import-s2" ${paper.already_in_library ? "disabled" : ""}>${paper.already_in_library ? "已导入" : "导入本地库"}</button>
+      </div>
+    </article>`;
+}
+
+function renderS2Results(data, context) {
+  s2Context = context;
+  const heading = $("#s2-result-heading");
+  heading.textContent = `${data.query || "发现结果"}：${data.total} 篇`;
+  heading.classList.remove("hidden");
+  if (data.warnings?.length) showNotice(data.warnings.join("；"));
+  $("#s2-results").innerHTML = data.papers.length
+    ? data.papers.map(renderS2Paper).join("")
+    : '<div class="empty">没有找到结果。可以换一个关键词，或提高每篇种子的抓取上限。</div>';
+}
+
+async function runS2Search() {
+  const query = $("#s2-query").value.trim();
+  if (query.length < 2) {
+    showNotice("请输入至少两个字符的搜索词。", true);
+    return;
+  }
+  $("#s2-results").innerHTML = '<div class="empty">正在查询 Semantic Scholar……</div>';
+  try {
+    const data = await request(`/api/v1/s2/search?q=${encodeURIComponent(query)}&limit=30`);
+    renderS2Results(data, { seedIds: [], relation: "none" });
+  } catch (error) {
+    showNotice(error.message, true);
+    $("#s2-results").innerHTML = '<div class="empty">查询失败</div>';
+  }
+}
+
+$("#s2-search").addEventListener("click", runS2Search);
+$("#s2-query").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") runS2Search();
+});
+
+async function expandS2(direction, button) {
+  const seedId = $("#s2-expand-seed").value;
+  if (!seedId) {
+    showNotice("请先选择一篇种子论文。", true);
+    return;
+  }
+  button.disabled = true;
+  $("#s2-results").innerHTML = '<div class="empty">正在展开一跳引用网络……</div>';
+  try {
+    const data = await request("/api/v1/s2/discover/expand", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seed_work_id: seedId, direction, limit: 100 }),
+    });
+    renderS2Results(data, {
+      seedIds: [seedId],
+      relation: direction === "citations" ? "cites_seeds" : "cited_by_seeds",
+    });
+  } catch (error) {
+    showNotice(error.message, true);
+    $("#s2-results").innerHTML = '<div class="empty">展开失败</div>';
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("#s2-citations").addEventListener("click", (event) => expandS2("citations", event.currentTarget));
+$("#s2-references").addEventListener("click", (event) => expandS2("references", event.currentTarget));
+
+$("#s2-intersection").addEventListener("click", async () => {
+  const button = $("#s2-intersection");
+  const seedIds = Array.from($("#s2-intersection-seeds").selectedOptions).map((option) => option.value);
+  if (seedIds.length < 2 || seedIds.length > 5) {
+    showNotice("请选择 2–5 篇种子论文。", true);
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "正在逐篇查询……";
+  $("#s2-results").innerHTML = '<div class="empty">正在查找同时引用全部种子的论文。系统会遵守 API 限流，请稍候……</div>';
+  try {
+    const yearValue = $("#s2-year-from").value;
+    const data = await request("/api/v1/s2/discover/intersection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        seed_work_ids: seedIds,
+        limit_per_seed: Number($("#s2-limit").value),
+        year_from: yearValue ? Number(yearValue) : null,
+      }),
+    });
+    renderS2Results(data, { seedIds, relation: "cites_seeds" });
+  } catch (error) {
+    showNotice(error.message, true);
+    $("#s2-results").innerHTML = '<div class="empty">交集查询失败</div>';
+  } finally {
+    button.disabled = false;
+    button.textContent = "查找交集";
+  }
+});
+
+$("#s2-results").addEventListener("click", async (event) => {
+  const button = event.target.closest(".import-s2");
+  if (!button) return;
+  const card = button.closest(".s2-card");
+  button.disabled = true;
+  button.textContent = "正在导入……";
+  try {
+    const result = await request("/api/v1/s2/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paper_id: card.dataset.paperId,
+        seed_work_ids: s2Context.seedIds,
+        relation: s2Context.relation,
+      }),
+    });
+    card.classList.add("imported");
+    card.querySelector(".rank").textContent = "已在本地库";
+    button.textContent = result.created ? "已导入" : "已存在";
+    showNotice(`《${result.work.title}》已进入本地库；新增 ${result.citation_edges_added} 条引用关系。`);
+    await loadSeedWorks();
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "导入本地库";
+    showNotice(error.message, true);
+  }
+});
+
 runSearch();
 loadLLMSettings();
+loadS2Settings();

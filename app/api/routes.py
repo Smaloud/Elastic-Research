@@ -20,8 +20,15 @@ from app.schemas import (
     LLMSettingsInput,
     LLMSettingsOut,
     LLMTestOut,
+    S2ExpandInput,
+    S2ImportInput,
+    S2ImportOut,
+    S2IntersectionInput,
+    S2PaperResults,
     SearchMode,
     SearchResponse,
+    SemanticScholarSettingsInput,
+    SemanticScholarSettingsOut,
     StateInput,
     StatePatch,
     WorkCreate,
@@ -41,6 +48,19 @@ from app.services.library import (
 from app.services.search import search_library
 from app.services.llm_client import LLMUnavailable, test_connection
 from app.services.llm_config import config_to_out, load_llm_config, save_llm_config
+from app.services.s2_config import (
+    config_to_out as s2_config_to_out,
+    load_s2_config,
+    save_s2_config,
+)
+from app.services.semantic_scholar import (
+    SemanticScholarUnavailable,
+    get_paper as get_s2_paper,
+    import_paper as import_s2_paper,
+    intersect_citations,
+    related_papers,
+    search_papers,
+)
 from app.services.serialization import analysis_to_out, fact_to_out, work_to_out
 
 
@@ -272,3 +292,116 @@ def review_fact(
     apply_fact_review(session, fact, payload.status)
     session.refresh(fact)
     return fact_to_out(fact)
+
+
+@router.get("/s2/settings", response_model=SemanticScholarSettingsOut)
+def get_s2_settings() -> SemanticScholarSettingsOut:
+    return s2_config_to_out(load_s2_config())
+
+
+@router.put("/s2/settings", response_model=SemanticScholarSettingsOut)
+def update_s2_settings(
+    payload: SemanticScholarSettingsInput,
+) -> SemanticScholarSettingsOut:
+    return s2_config_to_out(save_s2_config(payload))
+
+
+@router.post("/s2/test")
+def test_s2_connection(session: Session = Depends(get_db)) -> dict[str, object]:
+    try:
+        papers = search_papers(session, "SciBERT", 1)
+    except SemanticScholarUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "message": "连接成功",
+        "authenticated": bool(load_s2_config().api_key),
+        "sample_title": papers[0].title if papers else None,
+    }
+
+
+@router.get("/s2/search", response_model=S2PaperResults)
+def search_semantic_scholar(
+    q: str = Query(..., min_length=2, max_length=500),
+    limit: int = Query(20, ge=1, le=100),
+    session: Session = Depends(get_db),
+) -> S2PaperResults:
+    try:
+        papers = search_papers(session, q, limit)
+    except SemanticScholarUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return S2PaperResults(query=q, total=len(papers), papers=papers)
+
+
+@router.post("/s2/discover/expand", response_model=S2PaperResults)
+def expand_semantic_scholar(
+    payload: S2ExpandInput,
+    session: Session = Depends(get_db),
+) -> S2PaperResults:
+    work = _get_work_or_404(session, payload.seed_work_id)
+    try:
+        papers = related_papers(
+            session, work, payload.direction, payload.limit
+        )
+    except SemanticScholarUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    label = "引用它的论文" if payload.direction == "citations" else "它引用的论文"
+    return S2PaperResults(
+        query=f"《{work.title}》· {label}", total=len(papers), papers=papers
+    )
+
+
+@router.post("/s2/discover/intersection", response_model=S2PaperResults)
+def discover_semantic_scholar_intersection(
+    payload: S2IntersectionInput,
+    session: Session = Depends(get_db),
+) -> S2PaperResults:
+    works: list[models.Work] = []
+    for work_id in payload.seed_work_ids:
+        work = session.get(models.Work, work_id)
+        if work is None:
+            raise HTTPException(status_code=404, detail=f"未找到种子论文：{work_id}")
+        works.append(work)
+    try:
+        papers = intersect_citations(
+            session, works, payload.limit_per_seed, payload.year_from
+        )
+    except SemanticScholarUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return S2PaperResults(
+        query="同时引用全部种子论文",
+        total=len(papers),
+        papers=papers,
+        warnings=(
+            ["结果受每篇种子的抓取上限影响；高被引论文可提高“每篇最多获取”后重试。"]
+            if any((work.source_metadata or {}).get("semantic_scholar") is None for work in works)
+            else []
+        ),
+    )
+
+
+@router.post("/s2/import", response_model=S2ImportOut)
+def import_semantic_scholar_paper(
+    payload: S2ImportInput,
+    session: Session = Depends(get_db),
+) -> S2ImportOut:
+    seeds: list[models.Work] = []
+    for work_id in payload.seed_work_ids:
+        seeds.append(_get_work_or_404(session, work_id))
+    try:
+        paper = get_s2_paper(payload.paper_id)
+        work, created, edges, warnings = import_s2_paper(
+            session, paper, seeds, payload.relation
+        )
+    except SemanticScholarUnavailable as exc:
+        session.rollback()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except DuplicateWorkError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return S2ImportOut(
+        work=work_to_out(session, work),
+        created=created,
+        citation_edges_added=edges,
+        warnings=warnings,
+    )

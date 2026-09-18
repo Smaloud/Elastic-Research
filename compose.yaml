@@ -27,6 +27,7 @@ services:
       FIGURE_PATH: /data/figures
       MODEL_CACHE_PATH: /models
       LLM_CONFIG_PATH: /data/private/llm.json
+      SEMANTIC_SCHOLAR_CONFIG_PATH: /data/private/semantic_scholar.json
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-fastembed}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-384}

@@ -11,6 +11,7 @@ WorkKind = Literal["paper", "book", "thesis", "report", "chapter"]
 ReadingStatus = Literal["unread", "queued", "reading", "read", "archived"]
 SearchMode = Literal["hybrid", "keyword", "semantic"]
 LLMProvider = Literal["ollama", "openai_compatible"]
+S2Direction = Literal["citations", "references"]
 
 
 class StateInput(BaseModel):
@@ -218,3 +219,68 @@ class WorkAnalysisOut(BaseModel):
 
 class FactReviewInput(BaseModel):
     status: Literal["accepted", "rejected", "unreviewed"]
+
+
+class SemanticScholarSettingsInput(BaseModel):
+    api_key: str | None = Field(default=None, max_length=4000)
+    clear_api_key: bool = False
+
+
+class SemanticScholarSettingsOut(BaseModel):
+    api_key_configured: bool
+    api_key_hint: str | None = None
+    base_url: str = "https://api.semanticscholar.org/graph/v1"
+    throttle_seconds: float = 1.05
+
+
+class S2PaperCandidate(BaseModel):
+    paper_id: str
+    corpus_id: int | None = None
+    title: str
+    abstract: str | None = None
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    publication_date: date | None = None
+    venue: str | None = None
+    citation_count: int | None = None
+    reference_count: int | None = None
+    doi: str | None = None
+    arxiv_id: str | None = None
+    url: str | None = None
+    open_access_pdf_url: str | None = None
+    matched_seed_ids: list[uuid.UUID] = Field(default_factory=list)
+    matched_seed_titles: list[str] = Field(default_factory=list)
+    match_count: int = 0
+    already_in_library: bool = False
+
+
+class S2PaperResults(BaseModel):
+    query: str | None = None
+    total: int
+    papers: list[S2PaperCandidate]
+    warnings: list[str] = Field(default_factory=list)
+
+
+class S2IntersectionInput(BaseModel):
+    seed_work_ids: list[uuid.UUID] = Field(min_length=2, max_length=5)
+    limit_per_seed: int = Field(default=200, ge=10, le=500)
+    year_from: int | None = Field(default=None, ge=1000, le=3000)
+
+
+class S2ExpandInput(BaseModel):
+    seed_work_id: uuid.UUID
+    direction: S2Direction
+    limit: int = Field(default=100, ge=10, le=500)
+
+
+class S2ImportInput(BaseModel):
+    paper_id: str = Field(min_length=1, max_length=256)
+    seed_work_ids: list[uuid.UUID] = Field(default_factory=list, max_length=5)
+    relation: Literal["cites_seeds", "cited_by_seeds", "none"] = "none"
+
+
+class S2ImportOut(BaseModel):
+    work: WorkOut
+    created: bool
+    citation_edges_added: int
+    warnings: list[str] = Field(default_factory=list)

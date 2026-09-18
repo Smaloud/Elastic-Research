@@ -24,6 +24,9 @@
 - 可视化配置 Ollama 或 OpenAI 兼容 LLM；
 - 自动提取摘要、术语、资源、方法、数据集、实验发现、局限和最多 20 个建议标签；
 - 提取结果逐项审核，只有接受后的建议标签才写入检索标签。
+- Semantic Scholar 关键词搜索与候选预览；
+- 展开一篇论文的引用或参考文献，并保存本地引用关系；
+- 选择 2–5 篇本地种子，查找同时引用全部种子的后续研究。
 
 ## 在界面中接入 LLM
 
@@ -57,15 +60,27 @@ API Key 以仅当前系统用户可读的权限保存在本项目 `data/private/
 
 长文当前单次最多发送配置页指定的字符数，超过部分会显示警告。分段提取与分层汇总属于下一阶段。
 
+## Semantic Scholar 论文发现
+
+打开顶部“论文发现”页：
+
+1. 可以直接按标题、作者或关键词搜索外部论文。
+2. 选择一篇本地论文，可查看引用它的论文或它引用的论文。
+3. 在“谁同时引用了这些论文”中按住 `⌘` 选择 2–5 篇种子，再点击“查找交集”。
+4. 结果只会预览；点击“导入本地库”后才保存论文元数据和引用关系。
+
+大多数 Semantic Scholar 接口允许匿名访问，但匿名请求共享限流。遇到 429 时可稍后重试，或在页面内展开“Semantic Scholar API 设置”并填写自己的 Key。系统严格按约 1 请求/秒节流。Key 保存在 `data/private/semantic_scholar.json`，不会进入 Git。
+
 ## 数据位置与边界
 
 - PDF：`data/files`
 - LLM 配置：`data/private/llm.json`
+- Semantic Scholar 配置：`data/private/semantic_scholar.json`
 - PostgreSQL：Docker 命名卷 `paperlib_db`
 - 向量模型：Docker 命名卷 `paperlib_models`
 - 服务仅监听 `127.0.0.1`，尚未开放实验室多用户访问。
 - 扫描版 PDF 会标记为 `needs_ocr`；OCR/GROBID 尚未接入。
-- Semantic Scholar 引用扩张、自动综述、代理/MCP 接口和高级图表分析尚未接入。
+- 自动综述、代理/MCP 接口和高级图表分析尚未接入。
 
 ## 开发者故障排查（非日常操作）
 
