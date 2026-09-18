@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Paperlib · 本地论文库</title>
-    <link rel="stylesheet" href="/assets/styles.css?v=0.3.1" />
+    <link rel="stylesheet" href="/assets/styles.css?v=0.4.0" />
   </head>
   <body>
     <header class="topbar">
@@ -124,9 +124,9 @@
       <section id="view-llm" class="view">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">LOCAL-FIRST · REVIEW BEFORE WRITE</p>
+            <p class="eyebrow">LOCAL-FIRST · EVIDENCE-GROUNDED</p>
             <h2>LLM 结构化提取</h2>
-            <p class="subtitle">连接你自己的本地模型或 OpenAI 兼容服务。提取结果先进入审核区，不会自动改动人工标签。</p>
+            <p class="subtitle">连接你自己的本地模型或 OpenAI 兼容服务。提取结果按科研 taxonomy 自动分类、采用并写入数据库与检索标签。</p>
           </div>
           <span id="llm-status" class="status-pill">尚未配置</span>
         </div>
@@ -171,8 +171,8 @@
             <ol>
               <li>选择 Ollama 或兼容接口，保存后测试连接。</li>
               <li>回到资料库，在论文卡片上点击“LLM 提取”。</li>
-              <li>逐项审核术语、方法、数据集、发现、局限与建议标签。</li>
-              <li>只有接受的建议标签会写入检索标签。</li>
+              <li>系统按页分块，识别方法、数据、资源、实验配置和结果等精细类别。</li>
+              <li>有原文证据的结果会自动采用，标签自动进入检索。</li>
             </ol>
             <div class="privacy-note">
               <strong>数据边界</strong>
@@ -238,11 +238,11 @@
           </div>
           <button type="button" id="close-analysis" class="icon-button" aria-label="关闭">×</button>
         </div>
-        <p class="hint">模型结果可能有误。接受建议标签后才会写入资料库；其他条目会记录你的审核状态。</p>
+        <p class="hint">以下结果已自动采用。每项显示精确类别、结构化属性、证据原文、页码与置信度；重新提取会刷新模型生成的数据。</p>
         <div id="analysis-results" class="analysis-results"></div>
       </div>
     </dialog>
 
-    <script src="/assets/app.js?v=0.3.1" defer></script>
+    <script src="/assets/app.js?v=0.4.0" defer></script>
   </body>
 </html>

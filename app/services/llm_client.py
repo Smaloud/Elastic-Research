@@ -23,7 +23,12 @@ def _headers(config: LLMRuntimeConfig) -> dict[str, str]:
     return headers
 
 
-def chat(config: LLMRuntimeConfig, messages: list[dict[str, str]], timeout: float = 180) -> str:
+def chat(
+    config: LLMRuntimeConfig,
+    messages: list[dict[str, str]],
+    timeout: float = 180,
+    json_mode: bool = False,
+) -> str:
     if not config.enabled:
         raise LLMUnavailable("LLM 尚未启用，请先在“LLM 设置”中保存并启用配置")
     url = f"{config.base_url.rstrip('/')}/chat/completions"
@@ -33,6 +38,14 @@ def chat(config: LLMRuntimeConfig, messages: list[dict[str, str]], timeout: floa
         "temperature": config.temperature,
         "stream": False,
     }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+        # Qwen 3.8 defaults to a very large thinking budget. Taxonomy extraction
+        # is more reliable and much cheaper in constrained JSON mode.
+        if "qwen3.8" in config.model.casefold() and any(
+            host in config.base_url for host in ("aliyuncs.com", "dashscope")
+        ):
+            payload["enable_thinking"] = False
     try:
         with httpx.Client(timeout=timeout) as client:
             response = client.post(url, headers=_headers(config), json=payload)

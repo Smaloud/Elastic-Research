@@ -132,7 +132,7 @@ results.addEventListener("click", async (event) => {
       const data = await request(`/api/v1/works/${card.dataset.workId}/extract`, { method: "POST" });
       renderAnalysis(data);
       analysisDialog.showModal();
-      showNotice(data.warnings.length ? data.warnings.join("；") : "结构化提取完成，结果等待审核。");
+      showNotice(data.warnings.length ? data.warnings.join("；") : "结构化提取完成，分类结果与标签已自动采用。");
     } catch (error) {
       showNotice(error.message, true);
     } finally {
@@ -209,19 +209,68 @@ $("#add-form").addEventListener("submit", async (event) => {
 
 const factLabels = {
   summary: "摘要",
-  glossary: "术语",
-  resource: "资源",
-  method: "方法",
-  dataset: "数据集",
-  finding: "实验发现",
-  limitation: "局限",
-  suggested_tag: "建议标签",
+  research_goal: "研究目标 / 问题",
+  contribution: "主要贡献",
+  terminology: "术语与定义",
+  task: "研究任务",
+  method: "方法流程",
+  algorithm: "算法",
+  architecture: "模型 / 系统架构",
+  dataset: "数据集 / 语料",
+  benchmark: "基准任务 / 套件",
+  model: "模型",
+  software: "软件 / 框架 / 库",
+  code_repository: "代码仓库 / 实现资源",
+  hardware: "硬件设备",
+  compute_environment: "算力与运行环境",
+  baseline: "对比基线",
+  metric: "评测指标",
+  hyperparameter: "超参数",
+  training_setup: "训练配置",
+  experimental_setup: "实验设置",
+  evaluation_protocol: "评测协议",
+  statistical_test: "统计检验",
+  experimental_result: "实验结果",
+  ablation: "消融实验",
+  engineering_trick: "工程技巧 / 实现细节",
+  limitation: "局限与未解决问题",
+  future_work: "未来工作",
+  ethical_consideration: "伦理、安全与社会影响",
+  tag: "自动标签",
+  glossary: "术语（历史数据）",
+  resource: "资源（历史数据）",
+  finding: "实验发现（历史数据）",
+  suggested_tag: "建议标签（历史数据）",
+};
+
+const valueLabels = {
+  text: "内容",
+  subtype: "子类",
+  name: "名称",
+  description: "说明",
+  page: "页码",
+  attributes: "类别专属属性",
+  category_label: "分类",
 };
 
 function formatFactValue(value) {
   return Object.entries(value || {})
-    .map(([key, item]) => `${key}: ${typeof item === "object" ? JSON.stringify(item) : item}`)
+    .filter(([, item]) => item !== null && item !== "" && !(typeof item === "object" && !Object.keys(item).length))
+    .map(([key, item]) => {
+      const label = valueLabels[key] || key;
+      if (key === "page") return `${label}: 第 ${item} 页`;
+      if (key === "attributes" && typeof item === "object") {
+        const details = Object.entries(item).map(([attribute, detail]) => `  ${attribute}: ${typeof detail === "object" ? JSON.stringify(detail) : detail}`).join("\n");
+        return `${label}:\n${details}`;
+      }
+      return `${label}: ${typeof item === "object" ? JSON.stringify(item) : item}`;
+    })
     .join("\n");
+}
+
+function confidenceLabel(value) {
+  if (value === null || value === undefined) return "置信度未提供";
+  return `置信度 ${Math.round(value * 100)}%`;
 }
 
 function renderAnalysis(data) {
@@ -235,41 +284,13 @@ function renderAnalysis(data) {
     <article class="fact-card" data-fact-id="${fact.id}">
       <div class="fact-head">
         <span class="fact-type">${escapeHtml(factLabels[fact.fact_type] || fact.fact_type)}</span>
-        <span class="review-status">${fact.review_status === "accepted" ? "已接受" : fact.review_status === "rejected" ? "已拒绝" : "待审核"}</span>
+        <span class="review-status">自动采用 · ${confidenceLabel(fact.confidence)}</span>
       </div>
       <div class="fact-value">${escapeHtml(formatFactValue(fact.value))}</div>
       ${fact.evidence_text ? `<blockquote class="evidence">证据：${escapeHtml(fact.evidence_text)}</blockquote>` : ""}
-      <div class="review-actions">
-        <button class="small-button reject-button ${fact.review_status === "rejected" ? "rejected" : ""}" data-status="rejected">拒绝</button>
-        <button class="small-button accept-button ${fact.review_status === "accepted" ? "accepted" : ""}" data-status="accepted">接受</button>
-      </div>
     </article>
   `).join("");
 }
-
-$("#analysis-results").addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-status]");
-  if (!button) return;
-  const card = button.closest(".fact-card");
-  button.disabled = true;
-  try {
-    const fact = await request(`/api/v1/facts/${card.dataset.factId}/review`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: button.dataset.status }),
-    });
-    card.querySelector(".review-status").textContent = fact.review_status === "accepted" ? "已接受" : "已拒绝";
-    card.querySelectorAll("[data-status]").forEach((item) => item.classList.remove("accepted", "rejected"));
-    button.classList.add(fact.review_status);
-    if (fact.fact_type === "suggested_tag" && fact.review_status === "accepted") {
-      showNotice("建议标签已写入资料库。");
-    }
-  } catch (error) {
-    showNotice(error.message, true);
-  } finally {
-    button.disabled = false;
-  }
-});
 
 function setView(viewName) {
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));

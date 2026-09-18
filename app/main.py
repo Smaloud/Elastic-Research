@@ -7,7 +7,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.config import get_settings
-from app.database import initialize_database
+from app.database import SessionLocal, initialize_database
+from app.services.extraction import adopt_existing_extractions
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -22,6 +23,8 @@ async def lifespan(_: FastAPI):
     settings.model_cache_path.mkdir(parents=True, exist_ok=True)
     settings.llm_config_path.parent.mkdir(parents=True, exist_ok=True)
     initialize_database()
+    with SessionLocal() as session:
+        adopt_existing_extractions(session)
     yield
 
 

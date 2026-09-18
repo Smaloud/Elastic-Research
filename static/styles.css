@@ -98,10 +98,7 @@ dialog form { padding: 1.4rem; }
 .fact-type { color: var(--accent); font-size: .73rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .fact-value { margin: .55rem 0; color: #26372f; line-height: 1.55; white-space: pre-wrap; }
 .evidence { margin: .55rem 0; border-left: 2px solid #bdd2c7; padding-left: .7rem; color: var(--muted); font-size: .84rem; }
-.review-actions { display: flex; gap: .45rem; justify-content: flex-end; }
 .review-status { color: var(--muted); font-size: .78rem; }
-.accept-button.accepted { background: #e4f5ec; border-color: #8fc5ad; }
-.reject-button.rejected { background: #fbecea; border-color: #daa49c; color: #7d2e23; }
 .compact-settings { margin-bottom: 1rem; }
 .compact-settings summary { color: var(--accent-dark); font-weight: 750; }
 .inline-settings { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: .8rem; align-items: end; padding-top: 1rem; }
