@@ -226,6 +226,7 @@ class ZoteroSettingsInput(BaseModel):
     api_key: str | None = Field(default=None, max_length=4000)
     clear_api_key: bool = False
     collection_name: str = Field(default="Paperlib", min_length=1, max_length=255)
+    sync_collection_keys: list[str] = Field(default_factory=list)
     auto_push_discovered: bool = True
 
     @field_validator("collection_name")
@@ -245,6 +246,7 @@ class ZoteroSettingsOut(BaseModel):
     username: str | None = None
     collection_name: str
     collection_key: str | None = None
+    sync_collection_keys: list[str] = Field(default_factory=list)
     auto_push_discovered: bool
     last_library_version: int = 0
 
@@ -257,6 +259,28 @@ class ZoteroSyncOut(BaseModel):
     skipped: int = 0
     library_version: int = 0
     warnings: list[str] = Field(default_factory=list)
+
+
+class ZoteroCollectionOut(BaseModel):
+    key: str
+    name: str
+    parent_key: str | None = None
+
+
+class ResearchFactOut(BaseModel):
+    id: uuid.UUID
+    work_id: uuid.UUID
+    work_title: str
+    publication_year: int | None = None
+    fact_type: str
+    value: dict[str, Any]
+    confidence: float | None = None
+    evidence_text: str | None = None
+
+
+class ResearchFactResults(BaseModel):
+    total: int
+    facts: list[ResearchFactOut]
 
 
 class SemanticScholarSettingsInput(BaseModel):

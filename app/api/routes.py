@@ -27,6 +27,7 @@ from app.schemas import (
     S2PaperResults,
     SearchMode,
     SearchResponse,
+    ResearchFactResults,
     SemanticScholarSettingsInput,
     SemanticScholarSettingsOut,
     StateInput,
@@ -37,9 +38,10 @@ from app.schemas import (
     ZoteroSettingsInput,
     ZoteroSettingsOut,
     ZoteroSyncOut,
+    ZoteroCollectionOut,
 )
 from app.services.embeddings import EmbeddingUnavailable
-from app.services.extraction import apply_fact_review, extract_work
+from app.services.extraction import TAXONOMY, apply_fact_review, extract_work
 from app.services.library import (
     DuplicateDocumentError,
     DuplicateWorkError,
@@ -49,6 +51,7 @@ from app.services.library import (
     reindex_embeddings,
 )
 from app.services.search import search_library
+from app.services.research_query import query_facts
 from app.services.llm_client import LLMUnavailable, test_connection
 from app.services.llm_config import config_to_out, load_llm_config, save_llm_config
 from app.services.s2_config import (
@@ -73,6 +76,7 @@ from app.services.zotero_config import (
 from app.services.zotero_sync import (
     ZoteroUnavailable,
     push_work_if_enabled,
+    list_collections as list_zotero_collections,
     sync_library as sync_zotero_library,
     verify_connection as verify_zotero_connection,
 )
@@ -249,6 +253,34 @@ def search(
 def rebuild_embeddings(session: Session = Depends(get_db)) -> dict[str, object]:
     completed, warnings = reindex_embeddings(session)
     return {"embedded_sections": completed, "warnings": warnings}
+
+
+@router.get("/research/taxonomy")
+def get_research_taxonomy() -> dict[str, str]:
+    return TAXONOMY
+
+
+@router.get("/research/facts", response_model=ResearchFactResults)
+def search_research_facts(
+    q: str = Query("", max_length=1000),
+    fact_type: list[str] = Query(default=[]),
+    tag: str | None = Query(None, max_length=200),
+    year_from: int | None = Query(None, ge=1000, le=3000),
+    year_to: int | None = Query(None, ge=1000, le=3000),
+    min_confidence: float | None = Query(None, ge=0, le=1),
+    limit: int = Query(100, ge=1, le=500),
+    session: Session = Depends(get_db),
+) -> ResearchFactResults:
+    return query_facts(
+        session,
+        query=q,
+        fact_types=fact_type,
+        tag=tag,
+        year_from=year_from,
+        year_to=year_to,
+        min_confidence=min_confidence,
+        limit=limit,
+    )
 
 
 @router.get("/llm/settings", response_model=LLMSettingsOut)
@@ -438,6 +470,15 @@ def update_zotero_settings(payload: ZoteroSettingsInput) -> ZoteroSettingsOut:
 def test_zotero_connection() -> ZoteroSettingsOut:
     try:
         return zotero_config_to_out(verify_zotero_connection())
+    except ZoteroUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/zotero/collections", response_model=list[ZoteroCollectionOut])
+def get_zotero_collections() -> list[ZoteroCollectionOut]:
+    try:
+        _, collections = list_zotero_collections()
+        return [ZoteroCollectionOut(**item) for item in collections]
     except ZoteroUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

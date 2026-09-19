@@ -1,6 +1,8 @@
 import json
 import uuid
 
+import httpx
+
 from app import models
 from app.schemas import ZoteroSettingsInput
 from app.services import zotero_config, zotero_sync
@@ -15,6 +17,7 @@ def test_zotero_config_round_trip_masks_key(tmp_path, monkeypatch):
             enabled=True,
             api_key="zotero-secret-1234",
             collection_name="Paperlib Research",
+            sync_collection_keys=["COLL0001", "COLL0002"],
             auto_push_discovered=True,
         )
     )
@@ -25,6 +28,7 @@ def test_zotero_config_round_trip_masks_key(tmp_path, monkeypatch):
     public = zotero_config.config_to_out(zotero_config.load_zotero_config())
     assert public.api_key_configured is True
     assert public.api_key_hint == "••••1234"
+    assert public.sync_collection_keys == ["COLL0001", "COLL0002"]
     assert "secret" not in public.model_dump_json()
 
 
@@ -64,3 +68,32 @@ def test_zotero_parses_year_and_arxiv():
         zotero_sync._arxiv_id({"extra": "arXiv: 2401.12345v2"})
         == "2401.12345v2"
     )
+
+
+def test_zotero_fetches_only_selected_collections_and_deduplicates(monkeypatch):
+    calls = []
+
+    def fake_request(config, method, path, **kwargs):
+        calls.append(path)
+        key = path.split("/")[4]
+        return (
+            [{"key": "SHARED001", "data": {"title": key}}],
+            httpx.Headers({"Last-Modified-Version": "42"}),
+        )
+
+    monkeypatch.setattr(zotero_sync, "_request", fake_request)
+    config = zotero_config.ZoteroConfig(
+        api_key="key",
+        user_id=123,
+        sync_collection_keys=("COLL0001", "COLL0002"),
+        last_library_version=10,
+    )
+
+    items, version = zotero_sync._fetch_changed_items(config)
+
+    assert len(items) == 1
+    assert version == 42
+    assert calls == [
+        "/users/123/collections/COLL0001/items/top",
+        "/users/123/collections/COLL0002/items/top",
+    ]

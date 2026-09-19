@@ -335,48 +335,78 @@ def _import_item(
 
 def _fetch_changed_items(config: ZoteroConfig) -> tuple[list[dict[str, Any]], int]:
     assert config.user_id is not None
-    items: list[dict[str, Any]] = []
-    start = 0
+    if not config.sync_collection_keys:
+        raise ZoteroUnavailable("请先在 Zotero 页面选择至少一个需要同步的 collection")
+    items_by_key: dict[str, dict[str, Any]] = {}
     version = config.last_library_version
+    for collection_key in config.sync_collection_keys:
+        start = 0
+        while True:
+            data, headers = _request(
+                config,
+                "GET",
+                f"/users/{config.user_id}/collections/{collection_key}/items/top",
+                params={
+                    "format": "json",
+                    "limit": 100,
+                    "start": start,
+                    "since": config.last_library_version,
+                    "sort": "dateModified",
+                    "direction": "asc",
+                },
+            )
+            version = max(version, _library_version(headers, version))
+            page = data if isinstance(data, list) else []
+            for item in page:
+                if isinstance(item, dict) and item.get("key"):
+                    items_by_key[str(item["key"])] = item
+            if len(page) < 100:
+                break
+            start += 100
+            if start >= 10000:
+                raise ZoteroUnavailable(
+                    f"Zotero collection {collection_key} 超过单次 10000 条上限"
+                )
+    return list(items_by_key.values()), version
+
+
+def list_collections(config: ZoteroConfig | None = None) -> tuple[ZoteroConfig, list[dict[str, str | None]]]:
+    config = _ensure_identity(config or load_zotero_config())
+    assert config.user_id is not None
+    collections: list[dict[str, str | None]] = []
+    start = 0
     while True:
-        data, headers = _request(
+        data, _ = _request(
             config,
             "GET",
-            f"/users/{config.user_id}/items/top",
-            params={
-                "format": "json",
-                "limit": 100,
-                "start": start,
-                "since": config.last_library_version,
-                "sort": "dateModified",
-                "direction": "asc",
-            },
+            f"/users/{config.user_id}/collections",
+            params={"format": "json", "limit": 100, "start": start, "sort": "title"},
         )
-        version = max(version, _library_version(headers, version))
         page = data if isinstance(data, list) else []
-        items.extend(item for item in page if isinstance(item, dict))
+        for raw in page:
+            item = raw.get("data") or {}
+            if raw.get("key") and item.get("name"):
+                collections.append(
+                    {
+                        "key": str(raw["key"]),
+                        "name": str(item["name"]),
+                        "parent_key": str(item["parentCollection"]) if item.get("parentCollection") else None,
+                    }
+                )
         if len(page) < 100:
             break
         start += 100
-        if start >= 10000:
-            raise ZoteroUnavailable("Zotero 资料库超过单次 10000 条上限，请联系我启用分库同步")
-    return items, version
+    return config, collections
 
 
 def _ensure_collection(config: ZoteroConfig) -> ZoteroConfig:
     assert config.user_id is not None
     if config.collection_key:
         return config
-    data, _ = _request(
-        config,
-        "GET",
-        f"/users/{config.user_id}/collections",
-        params={"format": "json", "limit": 100},
-    )
-    for raw in data if isinstance(data, list) else []:
-        item = raw.get("data") or {}
-        if str(item.get("name") or "").strip() == config.collection_name:
-            return update_zotero_runtime(config, collection_key=str(raw.get("key")))
+    config, collections = list_collections(config)
+    for item in collections:
+        if item["name"] == config.collection_name:
+            return update_zotero_runtime(config, collection_key=str(item["key"]))
 
     result, headers = _request(
         config,

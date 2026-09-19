@@ -1,0 +1,6 @@
+interface:
+  display_name: "Paperlib Research"
+  short_description: "查询私人论文库，综合实验方法、结果、局限与工程技巧"
+  default_prompt: "Use $paperlib-research to search my local paper library and produce an evidence-backed synthesis."
+policy:
+  allow_implicit_invocation: true

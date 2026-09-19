@@ -17,6 +17,7 @@ class ZoteroConfig:
     username: str | None = None
     collection_name: str = "Paperlib"
     collection_key: str | None = None
+    sync_collection_keys: tuple[str, ...] = ()
     auto_push_discovered: bool = True
     last_library_version: int = 0
 
@@ -32,7 +33,10 @@ def load_zotero_config() -> ZoteroConfig:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         fields = ZoteroConfig.__dataclass_fields__
-        return ZoteroConfig(**{key: raw[key] for key in fields if key in raw})
+        values = {key: raw[key] for key in fields if key in raw}
+        if "sync_collection_keys" in values:
+            values["sync_collection_keys"] = tuple(values["sync_collection_keys"] or [])
+        return ZoteroConfig(**values)
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return ZoteroConfig()
 
@@ -67,6 +71,7 @@ def save_zotero_config(payload: ZoteroSettingsInput) -> ZoteroConfig:
             username=current.username if api_key else None,
             collection_name=payload.collection_name,
             collection_key=None if collection_changed else current.collection_key,
+            sync_collection_keys=tuple(dict.fromkeys(payload.sync_collection_keys)),
             auto_push_discovered=payload.auto_push_discovered,
             last_library_version=current.last_library_version if api_key else 0,
         )
@@ -89,6 +94,7 @@ def config_to_out(config: ZoteroConfig) -> ZoteroSettingsOut:
         username=config.username,
         collection_name=config.collection_name,
         collection_key=config.collection_key,
+        sync_collection_keys=list(config.sync_collection_keys),
         auto_push_discovered=config.auto_push_discovered,
         last_library_version=config.last_library_version,
     )

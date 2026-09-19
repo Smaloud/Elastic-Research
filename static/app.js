@@ -391,6 +391,18 @@ $("#test-llm").addEventListener("click", async () => {
 
 let zoteroAutoSynced = false;
 
+async function loadZoteroCollections(selectedKeys = null) {
+  const select = $("#zotero-source-collections");
+  const selected = new Set(
+    selectedKeys || Array.from(select.selectedOptions).map((option) => option.value)
+  );
+  const collections = await request("/api/v1/zotero/collections");
+  select.innerHTML = collections.length
+    ? collections.map((item) => `<option value="${escapeHtml(item.key)}" ${selected.has(item.key) ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.key)}</option>`).join("")
+    : '<option value="" disabled>当前 Zotero 资料库没有 collection</option>';
+  return collections;
+}
+
 async function loadZoteroSettings(runAutomaticSync = false) {
   try {
     const config = await request("/api/v1/zotero/settings");
@@ -407,7 +419,12 @@ async function loadZoteroSettings(runAutomaticSync = false) {
       ? (config.username ? `已启用 · ${config.username}` : "已启用 · 等待测试")
       : "尚未启用";
     status.classList.toggle("ready", config.enabled && config.api_key_configured);
-    if (runAutomaticSync && config.enabled && config.api_key_configured && !zoteroAutoSynced) {
+    if (config.user_id) {
+      await loadZoteroCollections(config.sync_collection_keys);
+    } else {
+      $("#zotero-source-collections").innerHTML = '<option value="" disabled>测试连接后加载 collection</option>';
+    }
+    if (runAutomaticSync && config.enabled && config.api_key_configured && config.sync_collection_keys.length && !zoteroAutoSynced) {
       zoteroAutoSynced = true;
       await runZoteroSync(true);
     }
@@ -431,6 +448,7 @@ $("#zotero-form").addEventListener("submit", async (event) => {
         api_key: $("#zotero-api-key").value || null,
         clear_api_key: $("#zotero-clear-key").checked,
         collection_name: $("#zotero-collection").value,
+        sync_collection_keys: Array.from($("#zotero-source-collections").selectedOptions).map((option) => option.value),
         auto_push_discovered: $("#zotero-auto-push").checked,
       }),
     });
@@ -457,6 +475,19 @@ $("#test-zotero").addEventListener("click", async () => {
   } finally {
     button.disabled = false;
     button.textContent = "测试连接";
+  }
+});
+
+$("#refresh-zotero-collections").addEventListener("click", async () => {
+  const button = $("#refresh-zotero-collections");
+  button.disabled = true;
+  try {
+    const collections = await loadZoteroCollections();
+    showNotice(`已加载 ${collections.length} 个 Zotero collections；请选择需要同步的范围并保存。`);
+  } catch (error) {
+    showNotice(error.message, true);
+  } finally {
+    button.disabled = false;
   }
 });
 

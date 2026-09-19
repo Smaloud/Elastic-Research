@@ -104,6 +104,7 @@ dialog form { padding: 1.4rem; }
 .sync-metrics { display: flex; flex-wrap: wrap; gap: .7rem; }
 .sync-metrics span { border: 1px solid var(--line); border-radius: 999px; padding: .45rem .7rem; color: var(--muted); background: #fff; }
 .sync-metrics strong { color: var(--accent-dark); margin-right: .2rem; }
+#zotero-source-collections { min-height: 10rem; padding: .35rem; }
 .compact-settings { margin-bottom: 1rem; }
 .compact-settings summary { color: var(--accent-dark); font-weight: 750; }
 .inline-settings { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: .8rem; align-items: end; padding-top: 1rem; }

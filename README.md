@@ -79,10 +79,22 @@ API Key 以仅当前系统用户可读的权限保存在本项目 `data/private/
 
 1. 在 [Zotero API Keys](https://www.zotero.org/settings/keys/new) 创建一个只供 Paperlib 使用的 Key，并允许读取、写入个人资料库。
 2. 在页面填写 Key、勾选启用并保存，然后点击“测试连接”。用户 ID 会自动识别，不需要手工查找。
-3. 点击“立即双向同步”。首次同步会读取 Zotero 已有文献，并按 DOI、arXiv、标题和年份关联或去重；Paperlib 中尚未关联的文献会写入指定 collection。
-4. 启用“自动写入”后，手工新增或从 Semantic Scholar 导入的论文会同时写入 Zotero；Paperlib 运行期间还会每 15 分钟执行一次增量同步，打开 Zotero 页面时也会立即同步。
+3. 测试成功后刷新 collection 列表，只选择希望交给 Paperlib 的一个或多个 collections，然后再次保存。Paperlib 不会扫描未选择的 Zotero collections。
+4. 点击“立即双向同步”。首次同步会读取所选范围，并按 DOI、arXiv、标题和年份关联或去重；Paperlib 中尚未关联的文献会写入指定的输出 collection。
+5. 启用“自动写入”后，手工新增或从 Semantic Scholar 导入的论文会同时写入 Zotero；Paperlib 运行期间还会每 15 分钟执行一次增量同步，打开 Zotero 页面时也会立即同步。
 
 同步默认不传播删除，也不会用空值或远端字段覆盖 Paperlib 已有人工信息。当前版本同步文献元数据和标签，PDF 附件双向传输将在下一阶段加入。Key 以仅当前系统用户可读的权限保存在 `data/private/zotero.json`，不会进入 Git。
+
+## 让 Codex 使用本地论文库
+
+项目随附并已安装 `$paperlib-research` skill。Paperlib 启动后，可以在 Codex 中直接提出这类请求：
+
+- “用 `$paperlib-research` 比较库内 UWB 定位论文的实验数据集、指标、基线和结果”；
+- “整理这些论文共同使用的 engineering tricks，并附论文、年份和原文证据”；
+- “汇总作者明确写出的局限与未来工作，再区分哪些研究空白是跨论文推断”；
+- “列出某个方向使用的方法、模型、软件、硬件和算力环境，不要混为一类资源”。
+
+skill 默认通过只读本地 API 查询 PostgreSQL/pgvector，不直接写数据库，也不会读取或显示保存的密钥。新安装的 skill 可能需要在新的 Codex 任务中才能被自动发现。已有论文如仍使用旧版宽泛类别，可在论文卡片重新执行一次“LLM 提取”，以获得实验结果、工程技巧等精细类别后再做比较。
 
 ## 数据位置与边界
 
@@ -94,7 +106,7 @@ API Key 以仅当前系统用户可读的权限保存在本项目 `data/private/
 - 向量模型：Docker 命名卷 `paperlib_models`
 - 服务仅监听 `127.0.0.1`，尚未开放实验室多用户访问。
 - 扫描版 PDF 会标记为 `needs_ocr`；OCR/GROBID 尚未接入。
-- 自动综述、代理/MCP 接口和高级图表分析尚未接入。
+- Codex 已可通过随附 skill 做结构化综述、实验结果对比和工程技巧整合；MCP 服务与高级图表分析尚未接入。
 
 ## 开发者故障排查（非日常操作）
 

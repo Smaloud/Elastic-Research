@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Paperlib · 本地论文库</title>
-    <link rel="stylesheet" href="/assets/styles.css?v=0.5.0" />
+    <link rel="stylesheet" href="/assets/styles.css?v=0.6.0" />
   </head>
   <body>
     <header class="topbar">
@@ -145,6 +145,10 @@
               <input id="zotero-api-key" type="password" autocomplete="new-password" placeholder="需要个人资料库的读取和写入权限" />
             </label>
             <label class="clear-key"><input id="zotero-clear-key" type="checkbox" /> 删除已保存的 API Key</label>
+            <label class="wide">只从这些 Zotero collections 导入（可多选）
+              <select id="zotero-source-collections" multiple size="7"></select>
+            </label>
+            <button type="button" class="small-button" id="refresh-zotero-collections">刷新 collection 列表</button>
             <label class="wide">写入 Zotero 的 collection 名称
               <input id="zotero-collection" value="Paperlib" />
             </label>
@@ -161,7 +165,7 @@
             <p class="eyebrow">SYNC POLICY</p>
             <h3>安全同步规则</h3>
             <ol>
-              <li>首次同步读取 Zotero 个人库，并按 DOI、arXiv、标题与年份去重。</li>
+              <li>只读取你在左侧选择的 collections，并按 DOI、arXiv、标题与年份去重。</li>
               <li>Paperlib 缺失的信息会被补全；人工已有字段不会被覆盖。</li>
               <li>本地未关联文献写入专用 collection，后续由 Zotero 自身同步到桌面端。</li>
               <li>Paperlib 运行期间每 15 分钟自动执行一次增量同步。</li>
@@ -299,6 +303,6 @@
       </div>
     </dialog>
 
-    <script src="/assets/app.js?v=0.5.0" defer></script>
+    <script src="/assets/app.js?v=0.6.0" defer></script>
   </body>
 </html>
